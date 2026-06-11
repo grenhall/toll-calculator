@@ -11,20 +11,22 @@ function getMinuteOfDay(date: Date): number {
 }
 
 const FEE_SCHEDULE = [
-  { from: toMinutes("06:00"), to: toMinutes("06:30"), fee:  8 },
+  { from: toMinutes("06:00"), to: toMinutes("06:30"), fee: 8 },
   { from: toMinutes("06:30"), to: toMinutes("07:00"), fee: 13 },
   { from: toMinutes("07:00"), to: toMinutes("08:00"), fee: 18 },
   { from: toMinutes("08:00"), to: toMinutes("08:30"), fee: 13 },
-  { from: toMinutes("08:30"), to: toMinutes("15:00"), fee:  8 },
+  { from: toMinutes("08:30"), to: toMinutes("15:00"), fee: 8 },
   { from: toMinutes("15:00"), to: toMinutes("15:30"), fee: 13 },
   { from: toMinutes("15:30"), to: toMinutes("17:00"), fee: 18 },
   { from: toMinutes("17:00"), to: toMinutes("18:00"), fee: 13 },
-  { from: toMinutes("18:00"), to: toMinutes("18:30"), fee:  8 },
+  { from: toMinutes("18:00"), to: toMinutes("18:30"), fee: 8 },
 ];
 
 const MAX_DAILY_FEE = 60;
 const CHARGE_INTERVAL_MINUTES = 60;
 
+//TODO: maybe add a case-insensitive comparison for extra safety?
+// return vehicle.type.toLowerCase() !== "car"
 function isTollFreeVehicle(vehicle: Vehicle): boolean {
   return vehicle.type !== "Car";
 }
@@ -48,22 +50,30 @@ export function getSinglePassFee(date: Date, vehicle: Vehicle): number {
   return 0;
 }
 
+//Same function as toDateKey in holidays. Refactor to a shared utility function?
 function dateKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
 function calculateFeeForSingleDay(vehicle: Vehicle, dates: Date[]): number {
-  let totalFee = 0;
-  let intervalStart = dates[0];
-  let intervalMaxFee = getSinglePassFee(intervalStart, vehicle);
+  // Free passes can never affect the total, so they must not
+  // participate in the window grouping either.
+  const passes = dates
+    .map((date) => ({ date, fee: getSinglePassFee(date, vehicle) }))
+    .filter((pass) => pass.fee > 0);
 
-  for (let i = 1; i < dates.length; i++) {
-    const date = dates[i];
-    const fee = getSinglePassFee(date, vehicle);
+  if (passes.length === 0) return 0;
+
+  let totalFee = 0;
+  let intervalStart = passes[0].date;
+  let intervalMaxFee = passes[0].fee;
+
+  for (let i = 1; i < passes.length; i++) {
+    const { date, fee } = passes[i];
     const minutesSinceIntervalStart =
       (date.getTime() - intervalStart.getTime()) / 60_000;
 
-    if (minutesSinceIntervalStart <= CHARGE_INTERVAL_MINUTES) {
+    if (minutesSinceIntervalStart < CHARGE_INTERVAL_MINUTES) {
       intervalMaxFee = Math.max(intervalMaxFee, fee);
     } else {
       totalFee += intervalMaxFee;

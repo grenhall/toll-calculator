@@ -11,15 +11,24 @@ export interface Vehicle {
   readonly type: VehicleType;
 }
 
+//If no one will use this move it into the test-file since it's only being used there.
 export function createVehicle(type: string): Vehicle {
   switch (type.trim().toLowerCase()) {
-    case "car":       return { type: "Car" };
-    case "motorbike": return { type: "Motorbike" };
-    case "tractor":   return { type: "Tractor" };
-    case "emergency": return { type: "Emergency" };
-    case "diplomat":  return { type: "Diplomat" };
-    case "foreign":   return { type: "Foreign" };
-    case "military":  return { type: "Military" };
-    default:          throw new Error(`Unknown vehicle type: "${type}"`);
+    case "car":
+      return { type: "Car" };
+    case "motorbike":
+      return { type: "Motorbike" };
+    case "tractor":
+      return { type: "Tractor" };
+    case "emergency":
+      return { type: "Emergency" };
+    case "diplomat":
+      return { type: "Diplomat" };
+    case "foreign":
+      return { type: "Foreign" };
+    case "military":
+      return { type: "Military" };
+    default:
+      throw new Error(`Unknown vehicle type: "${type}"`);
   }
 }

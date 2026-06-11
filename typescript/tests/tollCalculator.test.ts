@@ -2,15 +2,21 @@ import { describe, it, expect } from "vitest";
 import { getSinglePassFee, getDailyTollFee } from "../src/tollCalculator.js";
 import { createVehicle } from "../src/vehicle.js";
 
-const Car      = createVehicle("Car");
+const Car = createVehicle("Car");
 const Motorbike = createVehicle("Motorbike");
-const Tractor  = createVehicle("Tractor");
+const Tractor = createVehicle("Tractor");
 const Emergency = createVehicle("Emergency");
 const Diplomat = createVehicle("Diplomat");
-const Foreign  = createVehicle("Foreign");
+const Foreign = createVehicle("Foreign");
 const Military = createVehicle("Military");
 
-function date(year: number, month: number, day: number, hour = 0, minute = 0): Date {
+function date(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+): Date {
   return new Date(year, month - 1, day, hour, minute);
 }
 
@@ -20,16 +26,27 @@ describe("getSinglePassFee — fee schedule", () => {
   const weekday = (h: number, m: number) => date(2025, 3, 12, h, m); // Wednesday
 
   const cases: [number, number, number][] = [
-    [6, 0, 8], [6, 29, 8],
-    [6, 30, 13], [6, 59, 13],
-    [7, 0, 18], [7, 59, 18],
-    [8, 0, 13], [8, 29, 13],
-    [8, 30, 8], [14, 59, 8],
-    [15, 0, 13], [15, 29, 13],
-    [15, 30, 18], [16, 59, 18],
-    [17, 0, 13], [17, 59, 13],
-    [18, 0, 8], [18, 29, 8],
-    [18, 30, 0], [5, 59, 0], [0, 0, 0],
+    [6, 0, 8],
+    [6, 29, 8],
+    [6, 30, 13],
+    [6, 59, 13],
+    [7, 0, 18],
+    [7, 59, 18],
+    [8, 0, 13],
+    [8, 29, 13],
+    [8, 30, 8],
+    [14, 59, 8],
+    [15, 0, 13],
+    [15, 29, 13],
+    [15, 30, 18],
+    [16, 59, 18],
+    [17, 0, 13],
+    [17, 59, 13],
+    [18, 0, 8],
+    [18, 29, 8],
+    [18, 30, 0],
+    [5, 59, 0],
+    [0, 0, 0],
   ];
 
   it.each(cases)("at %i:%02i → %i SEK", (h, m, expected) => {
@@ -46,7 +63,7 @@ describe("getSinglePassFee — toll-free vehicles", () => {
     "$type is free",
     (vehicle) => {
       expect(getSinglePassFee(rushHour, vehicle)).toBe(0);
-    }
+    },
   );
 
   it("Car is charged", () => {
@@ -119,8 +136,8 @@ describe("getDailyTollFee — hourly deduplication", () => {
     expect(getDailyTollFee(Car, [wed(7, 0), wed(9, 0)])).toBe(26);
   });
 
-  it("exactly 60 minutes apart → same window", () => {
-    expect(getDailyTollFee(Car, [wed(7, 0), wed(8, 0)])).toBe(18);
+  it("exactly 60 minutes apart → separate windows", () => {
+    expect(getDailyTollFee(Car, [wed(7, 0), wed(8, 0)])).toBe(31);
   });
 
   it("61 minutes apart → separate windows", () => {
@@ -134,6 +151,32 @@ describe("getDailyTollFee — hourly deduplication", () => {
   it("window resets correctly after first expires", () => {
     // 06:00=8 (window 1), 07:30=18 (window 2), 08:00=13 (same as window 2) → 8 + 18 = 26
     expect(getDailyTollFee(Car, [wed(6, 0), wed(7, 30), wed(8, 0)])).toBe(26);
+  });
+});
+
+// ─── Free passes must not anchor charging windows ────────────────────────────
+
+describe("getDailyTollFee — free passes do not affect the total", () => {
+  const wed = (h: number, m: number) => date(2025, 3, 12, h, m);
+
+  it("a free pass before tolling hours does not anchor a window", () => {
+    // 05:50 = 0 kr, 06:40 = 13 kr, 07:10 = 18 kr.
+    // 06:40 and 07:10 are 30 min apart → one window → max(13, 18) = 18.
+    // Buggy code anchored the window at 05:50, splitting them: 13 + 18 = 31.
+    expect(getDailyTollFee(Car, [wed(5, 50), wed(6, 40), wed(7, 10)])).toBe(18);
+  });
+
+  it("control: same passes without the free one give the same total", () => {
+    expect(getDailyTollFee(Car, [wed(6, 40), wed(7, 10)])).toBe(18);
+  });
+
+  it("free passes interleaved between chargeable ones change nothing", () => {
+    // 07:00 = 18, 19:00 = 0, 19:30 = 0 → total 18
+    expect(getDailyTollFee(Car, [wed(7, 0), wed(19, 0), wed(19, 30)])).toBe(18);
+  });
+
+  it("a day with only free passes costs 0 and does not crash", () => {
+    expect(getDailyTollFee(Car, [wed(4, 0), wed(5, 30), wed(22, 0)])).toBe(0);
   });
 });
 
@@ -163,7 +206,9 @@ describe("getDailyTollFee — toll-free vehicle", () => {
   const wed = (h: number, m: number) => date(2025, 3, 12, h, m);
 
   it("motorbike pays 0 regardless of times", () => {
-    expect(getDailyTollFee(Motorbike, [wed(7, 0), wed(8, 0), wed(15, 30)])).toBe(0);
+    expect(
+      getDailyTollFee(Motorbike, [wed(7, 0), wed(8, 0), wed(15, 30)]),
+    ).toBe(0);
   });
 });
 
@@ -182,8 +227,13 @@ describe("getDailyTollFee — multiple days", () => {
     const wed = (h: number, m: number) => date(2025, 3, 12, h, m);
     const thu = (h: number, m: number) => date(2025, 3, 13, h, m);
     const passes = [
-      wed(6, 0), wed(7, 30), wed(9, 30), wed(11, 30),
-      wed(13, 30), wed(15, 30), wed(17, 30),
+      wed(6, 0),
+      wed(7, 30),
+      wed(9, 30),
+      wed(11, 30),
+      wed(13, 30),
+      wed(15, 30),
+      wed(17, 30),
       thu(7, 0),
     ];
     expect(getDailyTollFee(Car, passes)).toBe(78);
@@ -210,6 +260,8 @@ describe("createVehicle", () => {
   });
 
   it("throws on unknown type", () => {
-    expect(() => createVehicle("Truck")).toThrow('Unknown vehicle type: "Truck"');
+    expect(() => createVehicle("Truck")).toThrow(
+      'Unknown vehicle type: "Truck"',
+    );
   });
 });
